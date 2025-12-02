@@ -222,27 +222,57 @@ run_inference() {
         echo -e "${BLUE}🔄 Trying $BASE_URL$endpoint...${NC}"
 
         if [[ "$endpoint" == "/v1/chat/completions" ]]; then
-            inference_data=$(cat <<EOF
+            # Use jq to properly escape JSON
+            if command -v jq >/dev/null 2>&1; then
+                inference_data=$(jq -n \
+                    --arg model "$model" \
+                    --arg content "$prompt" \
+                    '{
+                        "model": $model,
+                        "messages": [{"role": "user", "content": $content}],
+                        "max_tokens": 150,
+                        "temperature": 0.7
+                    }')
+            else
+                # Fallback: manual escaping (basic)
+                escaped_prompt=$(echo "$prompt" | sed 's/"/\\"/g' | sed "s/'/\\'/g")
+                inference_data=$(cat <<EOF
 {
     "model": "$model",
     "messages": [
-        {"role": "user", "content": "$prompt"}
+        {"role": "user", "content": "$escaped_prompt"}
     ],
     "max_tokens": 150,
     "temperature": 0.7
 }
 EOF
 )
+            fi
         else
-            inference_data=$(cat <<EOF
+            # Use jq for completions endpoint too
+            if command -v jq >/dev/null 2>&1; then
+                inference_data=$(jq -n \
+                    --arg model "$model" \
+                    --arg prompt "$prompt" \
+                    '{
+                        "model": $model,
+                        "prompt": $prompt,
+                        "max_tokens": 150,
+                        "temperature": 0.7
+                    }')
+            else
+                # Fallback: manual escaping
+                escaped_prompt=$(echo "$prompt" | sed 's/"/\\"/g' | sed "s/'/\\'/g")
+                inference_data=$(cat <<EOF
 {
     "model": "$model",
-    "prompt": "$prompt",
+    "prompt": "$escaped_prompt",
     "max_tokens": 150,
     "temperature": 0.7
 }
 EOF
 )
+            fi
         fi
 
         if response=$(curl -s --connect-timeout 30 -X POST \
