@@ -269,9 +269,28 @@ echo -e "${BLUE}🚪 Port forwarding: localhost:${BOLD}$local_port${NC}${BLUE} -
 # Check if port is already in use
 if netstat -tuln 2>/dev/null | grep -q ":$local_port "; then
     echo -e "${YELLOW}⚠️  Port $local_port is already in use${NC}"
-    read -p "Continue anyway? (y/n): " continue_choice
-    if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
-        exit 1
+
+    # Check if it's a kubectl port-forward process
+    kubectl_pids=$(lsof -ti :$local_port 2>/dev/null | xargs ps -p 2>/dev/null | grep kubectl | awk '{print $1}' | grep -v PID || true)
+
+    if [ -n "$kubectl_pids" ]; then
+        echo -e "${WHITE}Found kubectl port-forward process(es): ${CYAN}$kubectl_pids${NC}"
+        read -p "Kill existing kubectl port-forward and retry? (y/n): " kill_choice
+        if [[ "$kill_choice" =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}🛑 Killing kubectl port-forward processes...${NC}"
+            echo "$kubectl_pids" | xargs kill 2>/dev/null || true
+            sleep 1
+            echo -e "${GREEN}✅ Processes killed${NC}"
+        else
+            echo -e "${CYAN}⏭️  Cancelled${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${WHITE}Port is used by non-kubectl process${NC}"
+        read -p "Continue anyway? (y/n): " continue_choice
+        if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
     fi
 fi
 
