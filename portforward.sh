@@ -132,18 +132,21 @@ local_port=""
 namespace=""
 remote_port=""
 
-# Handle special commands first
-if [[ "$1" == "--list" ]]; then
+# Handle special commands first - check for no args BEFORE accessing $1
+if [ $# -eq 0 ]; then
+    show_usage
+    exit 0
+elif [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+    show_usage
+    exit 0
+elif [[ "$1" == "--list" ]]; then
     list_forwards
     exit 0
 elif [[ "$1" == "--kill" ]]; then
-    kill_forward "$2"
+    kill_forward "${2:-}"
     exit 0
 elif [[ "$1" == "--kill-all" ]]; then
     kill_all_forwards
-    exit 0
-elif [ $# -eq 0 ] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
-    show_usage
     exit 0
 fi
 
@@ -278,7 +281,7 @@ if [ "$background_mode" = true ]; then
 
     # Start kubectl port-forward in background
     kubectl port-forward "svc/$selected_service" "$local_port:$remote_port" -n "$namespace" >/dev/null 2>&1 &
-    local pf_pid=$!
+    pf_pid=$!
 
     # Give it a moment to start
     sleep 2
